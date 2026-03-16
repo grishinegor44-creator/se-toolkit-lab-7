@@ -35,7 +35,7 @@ Docs:
 
 - Method 1: [Install `Node.js` using `nvm`](#install-nodejs-using-nvm)
 - Method 2: [Install `Node.js` using the commands from the official site](#install-nodejs-using-the-commands-from-the-official-site)
-- Method 3: [Install `Node.js` using `Nix`](#install-nodejs-using-nvm)
+- Method 3: [Install `Node.js` using `Nix`](#install-nodejs-using-nix)
 
 > [!NOTE]
 > Probably only the [`Nix`](./nix.md#what-is-nix) method will work
