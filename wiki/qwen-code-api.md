@@ -10,8 +10,7 @@
   - [Enter the `Qwen Code` API repository directory (REMOTE)](#enter-the-qwen-code-api-repository-directory-remote)
   - [Prepare the environment in the `Qwen Code` API repository (REMOTE)](#prepare-the-environment-in-the-qwen-code-api-repository-remote)
   - [Start the `Qwen Code` API (REMOTE)](#start-the-qwen-code-api-remote)
-  - [Get the `Qwen Code` API config values (REMOTE)](#get-the-qwen-code-api-config-values-remote)
-  - [Check that the `Qwen Code` API is accessible (REMOTE or LOCAL)](#check-that-the-qwen-code-api-is-accessible-remote-or-local)
+  - [Check that the `Qwen Code` API is accessible (REMOTE)](#check-that-the-qwen-code-api-is-accessible-remote)
 
 ## What is `Qwen Code` API
 
@@ -31,9 +30,7 @@ Complete these steps:
 4. [Enter the `Qwen Code` API repository directory (REMOTE)](#enter-the-qwen-code-api-repository-directory-remote).
 5. [Prepare the environment in the `Qwen Code` API repository (REMOTE)](#prepare-the-environment-in-the-qwen-code-api-repository-remote).
 6. [Start the `Qwen Code` API (REMOTE)](#start-the-qwen-code-api-remote).
-7. [Get the `Qwen Code` API config values (REMOTE)](#get-the-qwen-code-api-config-values-remote).
-8. [Check that the `Qwen Code` API is accessible (REMOTE)](#check-that-the-qwen-code-api-is-accessible-remote-or-local).
-9. [Check that the `Qwen Code` API is accessible (LOCAL)](#check-that-the-qwen-code-api-is-accessible-remote-or-local).
+7. [Check that the `Qwen Code` API is accessible (REMOTE)](#check-that-the-qwen-code-api-is-accessible-remote).
 
 ### Set up the `Qwen Code` CLI (REMOTE)
 
@@ -125,39 +122,14 @@ Complete these steps:
    docker compose up --build -d
    ```
 
-### Get the `Qwen Code` API config values (REMOTE)
+### Check that the `Qwen Code` API is accessible (REMOTE)
 
-1. [Connect to the VM](./vm-access.md#connect-to-the-vm-local) if not connected.
-
-2. To get the value of `HOST_PORT` in `.env`,
+1. To send an [`HTTP` request](./http.md#http-request) to the [`Qwen Code` API](#what-is-qwen-code-api),
 
    [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
 
    ```terminal
-   cat ~/qwen-code-api/.env | grep HOST_PORT
-   ```
-
-3. To get the value of `QWEN_CODE_API_KEY` in `.env`,
-
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   cat ~/qwen-code-api/.env | grep QWEN_CODE_API_KEY
-   ```
-
-### Check that the `Qwen Code` API is accessible (REMOTE or LOCAL)
-
-1. [Get the `Qwen Code` API config values (REMOTE)](#get-the-qwen-code-api-config-values-remote):
-
-   - `HOST_PORT`
-   - `QWEN_CODE_API_KEY`
-
-2. To send an [`HTTP` request](./http.md#http-request) to the [`Qwen Code` API](#what-is-qwen-code-api),
-
-   [run in the `VS Code Terminal`](./vs-code.md#run-a-command-in-the-vs-code-terminal):
-
-   ```terminal
-   curl -s http://<qwen-code-api-address>:<qwen-code-api-port>/v1/chat/completions \
+   curl -s http://localhost:<qwen-code-api-host-port>/v1/chat/completions \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer <qwen-code-api-key>" \
      -d '{"model":"<qwen-model>","messages":[{"role":"user","content":"What is 2+2?"}]}' \
@@ -166,14 +138,11 @@ Complete these steps:
 
    Replace placeholders:
 
-   - `<qwen-code-api-address>` with:
-     - `localhost` (REMOTE)
-     - [`<your-vm-ip-address>`](vm.md#your-vm-ip-address-placeholder) (LOCAL)
-   - `<qwen-code-api-port>` with the value of `HOST_PORT`
-   - `<qwen-code-api-key>` with the value of `QWEN_CODE_API_KEY`
+   - `<qwen-code-api-host-port>` with the value of [`QWEN_CODE_API_HOST_PORT`](./qwen-code-api-dotenv-secret.md#qwen_code_api_host_port) from [`~/qwen-code-api/.env.secret` (REMOTE)](./qwen-code-api-dotenv-secret.md#about-qwen-code-apienvsecret)
+   - `<qwen-code-api-key>` with the value of [`QWEN_CODE_API_KEY`](./qwen-code-api-dotenv-secret.md#qwen_code_api_key) from [`~/qwen-code-api/.env.secret` (REMOTE)](./qwen-code-api-dotenv-secret.md#about-qwen-code-apienvsecret)
    - `<qwen-model>` with one of the [available models](./qwen-code.md#view-available-models)
 
-3. When you run it, the output should be similar to this:
+2. When you run it, the output should be similar to this:
 
    ```terminal
    {
