@@ -110,10 +110,11 @@ If you filled in the LLM fields during setup (step 1.10), you're ready. If not, 
 Verify the LLM is reachable before testing the bot:
 
 ```terminal
-curl -s http://localhost:42005/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_LLM_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"YOUR_MODEL","messages":[{"role":"user","content":"hi"}]}' | head -c 100
+uv run poe query-qwen-code-api \
+  --base-url localhost:42005 \
+  --api-key YOUR_LLM_API_KEY \
+  --model YOUR_MODEL \
+  "hi"
 ```
 
 If this returns JSON with a response — the LLM is working. If it returns an error, fix the LLM connection first.
