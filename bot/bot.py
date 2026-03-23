@@ -1,42 +1,59 @@
 from __future__ import annotations
 
+import argparse
+import logging
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import argparse
-import os
-
 from config import AppConfig
 from handlers import route_input
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 
 def load_env_file(path: Path, *, overwrite: bool) -> None:
     if not path.exists():
         return
+
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
+
         if not line or line.startswith("#") or "=" not in line:
             continue
+
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
+
         if overwrite or key not in os.environ:
             os.environ[key] = value
 
 
 def load_config() -> AppConfig:
     root = Path(__file__).resolve().parent
+
     load_env_file(root / ".env.bot.example", overwrite=False)
-    load_env_file(root / ".env.bot.secret", overwrite=True)
+    load_env_file(root / ".env.bot.secret", overwrite=False)
+
     return AppConfig(
         bot_token=os.getenv("BOT_TOKEN"),
-        lms_api_url=os.getenv("LMS_API_URL", "http://localhost:42002"),
+        lms_api_url=os.getenv("LMS_API_URL", "http://backend:8000"),
         lms_api_key=os.getenv("LMS_API_KEY"),
         llm_api_key=os.getenv("LLM_API_KEY"),
-        llm_api_base_url=os.getenv("LLM_API_BASE_URL", "http://localhost:42005/v1"),
-        llm_api_model=os.getenv("LLM_API_MODEL", "qwen"),
+        llm_api_base_url=os.getenv(
+            "LLM_API_BASE_URL",
+            "https://openrouter.ai/api/v1",
+        ),
+        llm_api_model=os.getenv("LLM_API_MODEL", "openrouter/free"),
     )
 
 
@@ -50,8 +67,25 @@ def run_test_mode(text: str) -> int:
 def run_telegram_mode() -> int:
     config = load_config()
 
+    missing = []
     if not config.bot_token:
-        print("BOT_TOKEN is required to run Telegram mode.", file=sys.stderr)
+        missing.append("BOT_TOKEN")
+    if not config.lms_api_url:
+        missing.append("LMS_API_URL")
+    if not config.lms_api_key:
+        missing.append("LMS_API_KEY")
+    if not config.llm_api_key:
+        missing.append("LLM_API_KEY")
+    if not config.llm_api_base_url:
+        missing.append("LLM_API_BASE_URL")
+    if not config.llm_api_model:
+        missing.append("LLM_API_MODEL")
+
+    if missing:
+        print(
+            "Missing required environment variables: " + ", ".join(missing),
+            file=sys.stderr,
+        )
         return 1
 
     try:
@@ -71,12 +105,13 @@ def run_telegram_mode() -> int:
         )
         return 1
 
-    def _make_start_keyboard() -> InlineKeyboardMarkup:
+    def make_start_keyboard() -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "📚 Available labs", callback_data="what labs are available?"
+                        "📚 Available labs",
+                        callback_data="what labs are available?",
                     ),
                     InlineKeyboardButton(
                         "👥 Enrolled students",
@@ -85,7 +120,8 @@ def run_telegram_mode() -> int:
                 ],
                 [
                     InlineKeyboardButton(
-                        "🏆 Top 5 students", callback_data="who are the top 5 students?"
+                        "🏆 Top 5 students",
+                        callback_data="who are the top 5 students?",
                     ),
                     InlineKeyboardButton(
                         "📉 Lowest pass rate",
@@ -93,20 +129,31 @@ def run_telegram_mode() -> int:
                     ),
                 ],
                 [
-                    InlineKeyboardButton("🔄 Sync data", callback_data="sync the data"),
-                    InlineKeyboardButton("❓ Help", callback_data="/help"),
+                    InlineKeyboardButton(
+                        "🔄 Sync data",
+                        callback_data="sync the data",
+                    ),
+                    InlineKeyboardButton(
+                        "❓ Help",
+                        callback_data="/help",
+                    ),
                 ],
             ]
         )
 
-    async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def start_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         response = route_input("/start", config)
         if update.message:
             await update.message.reply_text(
-                response, reply_markup=_make_start_keyboard()
+                response,
+                reply_markup=make_start_keyboard(),
             )
 
-    async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def help_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         if update.message:
             await update.message.reply_text(route_input("/help", config))
 
@@ -116,7 +163,9 @@ def run_telegram_mode() -> int:
         if update.message:
             await update.message.reply_text(route_input("/health", config))
 
-    async def labs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def labs_command(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         if update.message:
             await update.message.reply_text(route_input("/labs", config))
 
@@ -129,7 +178,9 @@ def run_telegram_mode() -> int:
         if update.message:
             await update.message.reply_text(route_input(command_text, config))
 
-    async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def text_message(
+        update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         text = update.message.text if update.message and update.message.text else ""
         if update.message:
             await update.message.reply_text(route_input(text, config))
@@ -138,9 +189,14 @@ def run_telegram_mode() -> int:
         update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         query = update.callback_query
+        if query is None:
+            return
+
         await query.answer()
         response = route_input(query.data or "", config)
         await query.edit_message_text(response)
+
+    logger.info("Starting Telegram bot polling")
 
     application = Application.builder().token(config.bot_token).build()
     application.add_handler(CommandHandler("start", start_command))
@@ -152,7 +208,8 @@ def run_telegram_mode() -> int:
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_message)
     )
     application.add_handler(CallbackQueryHandler(button_callback))
-    application.run_polling()
+
+    application.run_polling(drop_pending_updates=True)
     return 0
 
 
