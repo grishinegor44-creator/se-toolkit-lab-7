@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import argparse
-import os
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-from commands import route_input  # ← исправлено: было "from handlers"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import argparse
+import os
+from dataclasses import dataclass
+
+from commands import route_input
 
 
 @dataclass
