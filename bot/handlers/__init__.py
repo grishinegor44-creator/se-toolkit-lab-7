@@ -1,3 +1,3 @@
-from .commands import route_input
+from commands import route_input
 
 __all__ = ["route_input"]

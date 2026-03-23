@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from handlers import route_input
+from commands import route_input  # ← исправлено: было "from handlers"
 
 
 @dataclass
@@ -43,7 +43,7 @@ def load_config() -> AppConfig:
 
     return AppConfig(
         bot_token=os.getenv("BOT_TOKEN"),
-        lms_api_url=os.getenv("LMS_API_URL"),
+        lms_api_url=os.getenv("LMS_API_URL", "http://localhost:42002"),
         lms_api_key=os.getenv("LMS_API_KEY"),
         llm_api_key=os.getenv("LLM_API_KEY"),
     )
