@@ -91,3 +91,22 @@ By the end of this lab, you should be able to say:
 2. [Backend Integration](./lab/tasks/required/task-2.md) — P0: slash commands + real data
 3. [Intent-Based Natural Language Routing](./lab/tasks/required/task-3.md) — P1: LLM tool use
 4. [Containerize and Document](./lab/tasks/required/task-4.md) — P3: containerize + deploy
+
+## Deploy
+
+This project is deployed on a VM with Docker Compose. The backend, database, frontend, and Telegram bot run as separate services.
+
+### Required environment variables
+
+Docker Compose uses `.env.docker.secret` as the main environment file.
+
+Required variables for the bot:
+
+```env
+BOT_TOKEN=your_telegram_bot_token
+LMS_API_URL=http://backend:8000
+LMS_API_KEY=your_lms_api_key
+LLM_API_KEY=your_llm_api_key
+LLM_API_BASE_URL=https://openrouter.ai/api/v1
+LLM_API_MODEL=openrouter/free
+
