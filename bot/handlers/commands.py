@@ -45,13 +45,25 @@ def _execute_tool(config: "AppConfig", name: str, args: dict) -> object:
         if name == "get_learners":
             return _get(config, "/learners/")
         if name == "get_scores":
-            return _get(config, "/analytics/scores", params={"lab": args.get("lab", "")})
+            lab = args.get("lab", "")
+            if not lab:
+                return {"error": "Missing required parameter 'lab'. Specify a lab ID like 'lab-01'."}
+            return _get(config, "/analytics/scores", params={"lab": lab})
         if name == "get_pass_rates":
-            return _get(config, "/analytics/pass-rates", params={"lab": args.get("lab", "")})
+            lab = args.get("lab", "")
+            if not lab:
+                return {"error": "Missing required parameter 'lab'. Specify a lab ID like 'lab-01'."}
+            return _get(config, "/analytics/pass-rates", params={"lab": lab})
         if name == "get_timeline":
-            return _get(config, "/analytics/timeline", params={"lab": args.get("lab", "")})
+            lab = args.get("lab", "")
+            if not lab:
+                return {"error": "Missing required parameter 'lab'. Specify a lab ID like 'lab-01'."}
+            return _get(config, "/analytics/timeline", params={"lab": lab})
         if name == "get_groups":
-            return _get(config, "/analytics/groups", params={"lab": args.get("lab", "")})
+            lab = args.get("lab", "")
+            if not lab:
+                return {"error": "Missing required parameter 'lab'. Specify a lab ID like 'lab-01'."}
+            return _get(config, "/analytics/groups", params={"lab": lab})
         if name == "get_top_learners":
             params: dict = {}
             if "lab" in args:
@@ -60,7 +72,10 @@ def _execute_tool(config: "AppConfig", name: str, args: dict) -> object:
                 params["limit"] = args["limit"]
             return _get(config, "/analytics/top-learners", params=params)
         if name == "get_completion_rate":
-            return _get(config, "/analytics/completion-rate", params={"lab": args.get("lab", "")})
+            lab = args.get("lab", "")
+            if not lab:
+                return {"error": "Missing required parameter 'lab'. Specify a lab ID like 'lab-01'."}
+            return _get(config, "/analytics/completion-rate", params={"lab": lab})
         if name == "trigger_sync":
             return _post(config, "/pipeline/sync")
         return {"error": f"Unknown tool: {name}"}
@@ -122,8 +137,7 @@ TOOLS = [
                 "Use this to answer ANY question about pass rates, failure rates, success rates, "
                 "how well students performed, which lab is easiest or hardest, "
                 "which lab has the highest or lowest pass rate, or per-task scores. "
-                "For cross-lab comparisons, call get_items first to get all lab IDs, "
-                "then call get_pass_rates for EACH lab, then compare."
+                "For cross-lab comparisons, call this for EACH lab separately, then compare."
             ),
             "parameters": {
                 "type": "object",
@@ -230,7 +244,7 @@ TOOLS = [
 SYSTEM_PROMPT = (
     "You are a helpful LMS assistant bot for a university lab course. "
     "You MUST always call tools to answer questions — never say data is unavailable without trying. "
-    "Never ask clarifying questions before calling tools — always attempt to answer with the tools. \n\n"
+    "Never ask clarifying questions before calling tools — always attempt to answer with the tools.\n\n"
     "Tool selection guide:\n"
     "- 'what labs', 'list labs', 'available labs' → get_items\n"
     "- 'pass rate', 'success rate', 'failure rate', 'hardest lab', 'easiest lab', "
@@ -242,11 +256,10 @@ SYSTEM_PROMPT = (
     "- 'score distribution', 'grade buckets' → get_scores\n"
     "- 'sync', 'refresh', 'update data' → trigger_sync\n\n"
     "For cross-lab comparisons (e.g. 'which lab has the highest/lowest pass rate'):\n"
-    "  Step 1: call get_items to get all lab IDs\n"
-    "  Step 2: call the relevant tool (e.g. get_pass_rates) for EACH lab\n"
-    "  Step 3: compare results and give a specific answer with numbers\n\n"
-    "If the user sends 'lab 4' or an ambiguous message, call get_pass_rates for lab-04 "
-    "and show its data — don't ask what they want, just show the most useful info.\n"
+    "  Step 1: call get_pass_rates for EACH known lab ID (do NOT call get_items first — lab IDs are provided below)\n"
+    "  Step 2: compare results and give a specific answer with numbers\n\n"
+    "If the user sends 'lab 4' or just a lab name, call get_pass_rates for that lab "
+    "and show its per-task data — don't ask what they want, just show the most useful info.\n"
     "If the user says hello or sends gibberish, respond with a friendly greeting "
     "and list 4-5 example questions they can ask.\n"
     "Always include actual numbers, lab names, and task names in your answers. "
@@ -273,6 +286,29 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
             "Use /help to see available slash commands."
         )
 
+    # Pre-fetch lab IDs and inject into system prompt so LLM skips get_items step
+    labs_context = ""
+    try:
+        items = _get(config, "/items/")
+        lab_ids = sorted({
+            item.get("lab_id") or item.get("lab") or ""
+            for item in items
+            if (item.get("lab_id") or item.get("lab"))
+        } - {""})
+        if not lab_ids:
+            lab_ids = [
+                item.get("id", "") for item in items
+                if item.get("type") == "lab" and item.get("id")
+            ]
+        if lab_ids:
+            labs_context = (
+                f"\n\nKnown lab IDs (use these exactly when calling tools): {', '.join(lab_ids)}. "
+                f"Total: {len(lab_ids)} labs."
+            )
+            print(f"[context] Pre-loaded {len(lab_ids)} lab IDs: {lab_ids}", file=sys.stderr)
+    except Exception as e:
+        print(f"[context] Could not pre-fetch labs: {e}", file=sys.stderr)
+
     client = OpenAI(
         api_key=config.llm_api_key,
         base_url=(config.llm_api_base_url or "http://localhost:42005/v1"),
@@ -284,7 +320,7 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
     model = config.llm_api_model or "qwen"
 
     messages: list[dict] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPT + labs_context},
         {"role": "user", "content": text},
     ]
 
