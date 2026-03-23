@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 # Backend HTTP helpers
 # ──────────────────────────────────────────────
 
-
 def _get(config: "AppConfig", path: str, params: dict | None = None) -> list | dict:
     url = (config.lms_api_url or "http://localhost:42002").rstrip("/") + path
     headers = {"Authorization": f"Bearer {config.lms_api_key}"}
@@ -35,35 +34,24 @@ def _fmt_error(e: Exception, url: str) -> str:
     if isinstance(e, httpx.ConnectError):
         return f"Backend error: connection refused ({url}). Check that the services are running."
     if isinstance(e, httpx.HTTPStatusError):
-        return (
-            f"Backend error: HTTP {e.response.status_code} {e.response.reason_phrase}."
-        )
+        return f"Backend error: HTTP {e.response.status_code} {e.response.reason_phrase}."
     return f"Backend error: {e}."
 
 
 def _execute_tool(config: "AppConfig", name: str, args: dict) -> object:
-    """Execute a named tool and return a JSON-serializable result."""
     try:
         if name == "get_items":
             return _get(config, "/items/")
         if name == "get_learners":
             return _get(config, "/learners/")
         if name == "get_scores":
-            return _get(
-                config, "/analytics/scores", params={"lab": args.get("lab", "")}
-            )
+            return _get(config, "/analytics/scores", params={"lab": args.get("lab", "")})
         if name == "get_pass_rates":
-            return _get(
-                config, "/analytics/pass-rates", params={"lab": args.get("lab", "")}
-            )
+            return _get(config, "/analytics/pass-rates", params={"lab": args.get("lab", "")})
         if name == "get_timeline":
-            return _get(
-                config, "/analytics/timeline", params={"lab": args.get("lab", "")}
-            )
+            return _get(config, "/analytics/timeline", params={"lab": args.get("lab", "")})
         if name == "get_groups":
-            return _get(
-                config, "/analytics/groups", params={"lab": args.get("lab", "")}
-            )
+            return _get(config, "/analytics/groups", params={"lab": args.get("lab", "")})
         if name == "get_top_learners":
             params: dict = {}
             if "lab" in args:
@@ -72,11 +60,7 @@ def _execute_tool(config: "AppConfig", name: str, args: dict) -> object:
                 params["limit"] = args["limit"]
             return _get(config, "/analytics/top-learners", params=params)
         if name == "get_completion_rate":
-            return _get(
-                config,
-                "/analytics/completion-rate",
-                params={"lab": args.get("lab", "")},
-            )
+            return _get(config, "/analytics/completion-rate", params={"lab": args.get("lab", "")})
         if name == "trigger_sync":
             return _post(config, "/pipeline/sync")
         return {"error": f"Unknown tool: {name}"}
@@ -85,7 +69,7 @@ def _execute_tool(config: "AppConfig", name: str, args: dict) -> object:
 
 
 # ──────────────────────────────────────────────
-# LLM tool schemas  (9 endpoints)
+# LLM tool schemas (9 endpoints)
 # ──────────────────────────────────────────────
 
 TOOLS = [
@@ -93,7 +77,10 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_items",
-            "description": "Get the complete list of labs and tasks available in the LMS",
+            "description": (
+                "Get the complete list of all labs and their tasks available in the LMS. "
+                "Call this first when you need to discover lab IDs before querying per-lab analytics."
+            ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -101,7 +88,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_learners",
-            "description": "Get the list of enrolled students and their group assignments",
+            "description": (
+                "Get the list of all enrolled students and their group assignments. "
+                "Use this to answer questions about how many students are enrolled, "
+                "student groups, or when the user asks about participants."
+            ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -109,14 +100,14 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_scores",
-            "description": "Get score distribution across grade buckets for a specific lab",
+            "description": (
+                "Get score distribution across grade buckets (e.g. 0-25%, 25-50%, etc.) "
+                "for a specific lab. Use this to show grade distribution or histogram data."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lab": {
-                        "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'",
-                    }
+                    "lab": {"type": "string", "description": "Lab identifier, e.g. 'lab-01'"},
                 },
                 "required": ["lab"],
             },
@@ -126,14 +117,18 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_pass_rates",
-            "description": "Get per-task average scores and attempt counts for a specific lab",
+            "description": (
+                "Get the pass rate, success rate, and attempt count per task for a specific lab. "
+                "Use this to answer ANY question about pass rates, failure rates, success rates, "
+                "how well students performed, which lab is easiest or hardest, "
+                "which lab has the highest or lowest pass rate, or per-task scores. "
+                "For cross-lab comparisons, call get_items first to get all lab IDs, "
+                "then call get_pass_rates for EACH lab, then compare."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lab": {
-                        "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'",
-                    }
+                    "lab": {"type": "string", "description": "Lab identifier, e.g. 'lab-01'"},
                 },
                 "required": ["lab"],
             },
@@ -143,14 +138,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_timeline",
-            "description": "Get the number of submissions per day for a specific lab",
+            "description": (
+                "Get the number of submissions per day for a specific lab. "
+                "Use this for questions about submission activity over time, "
+                "peak days, or submission trends."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lab": {
-                        "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'",
-                    }
+                    "lab": {"type": "string", "description": "Lab identifier, e.g. 'lab-01'"},
                 },
                 "required": ["lab"],
             },
@@ -160,14 +156,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_groups",
-            "description": "Get per-group average scores and student counts for a specific lab",
+            "description": (
+                "Get per-group average scores and student counts for a specific lab. "
+                "Use this to compare student groups, find the best or worst group, "
+                "or answer questions like 'which group is doing best in lab X?'."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lab": {
-                        "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'",
-                    }
+                    "lab": {"type": "string", "description": "Lab identifier, e.g. 'lab-01'"},
                 },
                 "required": ["lab"],
             },
@@ -177,17 +174,22 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_top_learners",
-            "description": "Get the top N learners ranked by score for a specific lab",
+            "description": (
+                "Get the top N learners ranked by score. "
+                "Use this to answer questions about leaderboard, top students, "
+                "best performers, or 'who are the top 5 students?'. "
+                "Omit 'lab' to get global ranking."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "lab": {
                         "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'. Omit to query globally.",
+                        "description": "Lab identifier, e.g. 'lab-01'. Omit for global ranking.",
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "How many top learners to return (default 10)",
+                        "description": "Number of top learners to return (default 10).",
                     },
                 },
                 "required": [],
@@ -198,14 +200,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_completion_rate",
-            "description": "Get the overall completion rate percentage for a specific lab",
+            "description": (
+                "Get the overall completion rate percentage for a specific lab — "
+                "i.e. what fraction of students completed the lab. "
+                "Use this for questions about completion, how many students finished a lab."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lab": {
-                        "type": "string",
-                        "description": "Lab identifier, e.g. 'lab-01'",
-                    }
+                    "lab": {"type": "string", "description": "Lab identifier, e.g. 'lab-01'"},
                 },
                 "required": ["lab"],
             },
@@ -215,7 +218,10 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "trigger_sync",
-            "description": "Trigger a data refresh/sync from the autochecker to update all analytics",
+            "description": (
+                "Trigger a data refresh/sync from the autochecker to update all analytics. "
+                "Use this when the user asks to sync, refresh, or update the data."
+            ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -223,20 +229,34 @@ TOOLS = [
 
 SYSTEM_PROMPT = (
     "You are a helpful LMS assistant bot for a university lab course. "
-    "Use the provided tools to answer questions about labs, learners, scores, and analytics. "
-    "Always call the appropriate tools — never guess data. "
-    "For questions comparing multiple labs (e.g. 'which lab has the lowest pass rate'), "
-    "first call get_items to discover all lab IDs, then call the relevant tool for each lab, "
-    "then compare the results. "
-    "If the user says hello or sends gibberish, respond politely and list what you can do. "
-    "Format responses with bullet points and numbers where useful."
+    "You MUST always call tools to answer questions — never say data is unavailable without trying. "
+    "Never ask clarifying questions before calling tools — always attempt to answer with the tools. \n\n"
+    "Tool selection guide:\n"
+    "- 'what labs', 'list labs', 'available labs' → get_items\n"
+    "- 'pass rate', 'success rate', 'failure rate', 'hardest lab', 'easiest lab', "
+    "'highest/lowest pass rate', 'scores for lab X', 'how well did students do' → get_pass_rates\n"
+    "- 'top students', 'leaderboard', 'best students', 'top N students' → get_top_learners\n"
+    "- 'groups', 'which group is best', 'compare groups' → get_groups\n"
+    "- 'how many students', 'enrolled students', 'participants' → get_learners\n"
+    "- 'completion rate', 'who finished', 'how many completed' → get_completion_rate\n"
+    "- 'score distribution', 'grade buckets' → get_scores\n"
+    "- 'sync', 'refresh', 'update data' → trigger_sync\n\n"
+    "For cross-lab comparisons (e.g. 'which lab has the highest/lowest pass rate'):\n"
+    "  Step 1: call get_items to get all lab IDs\n"
+    "  Step 2: call the relevant tool (e.g. get_pass_rates) for EACH lab\n"
+    "  Step 3: compare results and give a specific answer with numbers\n\n"
+    "If the user sends 'lab 4' or an ambiguous message, call get_pass_rates for lab-04 "
+    "and show its data — don't ask what they want, just show the most useful info.\n"
+    "If the user says hello or sends gibberish, respond with a friendly greeting "
+    "and list 4-5 example questions they can ask.\n"
+    "Always include actual numbers, lab names, and task names in your answers. "
+    "Format responses with bullet points where helpful."
 )
 
 
 # ──────────────────────────────────────────────
 # LLM tool-calling loop
 # ──────────────────────────────────────────────
-
 
 def handle_natural_language(config: "AppConfig", text: str) -> str:
     try:
@@ -256,6 +276,10 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
     client = OpenAI(
         api_key=config.llm_api_key,
         base_url=(config.llm_api_base_url or "http://localhost:42005/v1"),
+        default_headers={
+            "HTTP-Referer": "https://github.com/grishinegor44-creator/se-toolkit-lab-7",
+            "X-Title": "SE Toolkit Lab 7 Bot",
+        },
     )
     model = config.llm_api_model or "qwen"
 
@@ -284,7 +308,6 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
 
         choice = response.choices[0]
 
-        # Append assistant turn (must include tool_calls if present)
         assistant_msg: dict = {"role": "assistant", "content": choice.message.content}
         if choice.message.tool_calls:
             assistant_msg["tool_calls"] = [
@@ -300,11 +323,9 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
             ]
         messages.append(assistant_msg)
 
-        # No tool calls → final answer
         if choice.finish_reason != "tool_calls" or not choice.message.tool_calls:
             return choice.message.content or "I couldn't generate a response."
 
-        # Execute every tool call and feed results back
         print(
             f"[summary] Feeding {len(choice.message.tool_calls)} tool result(s) back to LLM",
             file=sys.stderr,
@@ -321,13 +342,11 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
             result_str = json.dumps(result)
             print(f"[tool] Result: {len(result_str)} chars", file=sys.stderr)
 
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result_str,
-                }
-            )
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result_str,
+            })
 
     return "Sorry, I couldn't complete the request after multiple reasoning steps."
 
@@ -335,7 +354,6 @@ def handle_natural_language(config: "AppConfig", text: str) -> str:
 # ──────────────────────────────────────────────
 # Slash command handlers
 # ──────────────────────────────────────────────
-
 
 def handle_start(_: "AppConfig", __: str) -> str:
     return (
@@ -426,22 +444,16 @@ def handle_unknown(_: "AppConfig", text: str) -> str:
 # Main router
 # ──────────────────────────────────────────────
 
-
 def route_input(text: str, config: "AppConfig") -> str:
     normalized = (text or "").strip()
     if not normalized:
         return "Empty input. Use /start or /help."
     if normalized.startswith("/"):
         command = normalized.split()[0].lower()
-        if command == "/start":
-            return handle_start(config, normalized)
-        if command == "/help":
-            return handle_help(config, normalized)
-        if command == "/health":
-            return handle_health(config, normalized)
-        if command == "/labs":
-            return handle_labs(config, normalized)
-        if command == "/scores":
-            return handle_scores(config, normalized)
+        if command == "/start":   return handle_start(config, normalized)
+        if command == "/help":    return handle_help(config, normalized)
+        if command == "/health":  return handle_health(config, normalized)
+        if command == "/labs":    return handle_labs(config, normalized)
+        if command == "/scores":  return handle_scores(config, normalized)
         return handle_unknown(config, normalized)
     return handle_natural_language(config, normalized)
