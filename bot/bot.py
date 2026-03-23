@@ -9,7 +9,7 @@ import argparse
 import os
 from dataclasses import dataclass
 
-from commands import route_input
+from handlers import route_input
 
 
 @dataclass
