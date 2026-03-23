@@ -3,7 +3,7 @@ name = "se-toolkit-lab-7-bot"
 version = "0.1.0"
 description = "Telegram bot scaffold for SE Toolkit Lab 7"
 requires-python = ">=3.11,<3.14"
-dependencies = ["httpx", "python-telegram-bot"]
+dependencies = ["httpx", "python-telegram-bot", "openai>=1.0"]
 
 [tool.uv]
 package = false
